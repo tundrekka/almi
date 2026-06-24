@@ -1,0 +1,92 @@
+@import "tailwindcss";
+
+@theme {
+  /* ZALUT — monocromo ejecutivo (panel interno, blanco y negro) */
+  --color-paper: #f4f4f5;       /* fondo, zinc-100 */
+  --color-ink: #09090b;         /* texto principal, casi negro */
+  --color-electric: #27272a;    /* acento / links / activo, zinc-800 */
+  --color-mint: #e4e4e7;        /* realce sutil, zinc-200 */
+  --color-lila: #52525b;        /* acento secundario, zinc-600 */
+
+  /* Neutral support */
+  --color-line: #e4e4e7;        /* bordes, zinc-200 */
+  --color-soft: #ffffff;
+  --color-muted: #71717a;       /* texto secundario, zinc-500 */
+
+  --font-sans: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
+
+  --radius-card: 1rem;
+  --radius-pill: 999px;
+}
+
+html,
+body {
+  background: #f4f4f5;
+  color: #09090b;
+  font-family: var(--font-sans);
+}
+
+::selection {
+  background: #09090b;
+  color: #ffffff;
+}
+
+/* Subtle category-chip scroll row */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Card lift */
+.lift {
+  transition:
+    transform 0.35s cubic-bezier(0.2, 0.8, 0.2, 1),
+    box-shadow 0.35s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.lift:hover {
+  transform: translateY(-4px);
+  box-shadow:
+    0 10px 30px -12px rgba(33, 37, 41, 0.18),
+    0 4px 8px -4px rgba(33, 37, 41, 0.06);
+}
+
+/* Soft entrance */
+@keyframes fade-up {
+  from {
+    transform: translateY(14px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+.fade-up {
+  opacity: 0;
+  animation: fade-up 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+}
+
+/* Tabular numerals */
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Hero blob (decorative gradient) */
+.blob {
+  background:
+    radial-gradient(60% 60% at 30% 30%, rgba(45, 90, 254, 0.18), transparent 60%),
+    radial-gradient(50% 50% at 80% 70%, rgba(138, 43, 226, 0.18), transparent 60%),
+    radial-gradient(60% 60% at 70% 20%, rgba(181, 255, 225, 0.5), transparent 60%);
+  filter: blur(40px);
+}
+
+/* Floating product card subtle hover */
+.float {
+  transition: transform 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.float:hover {
+  transform: translateY(-6px) rotate(0deg) !important;
+}
