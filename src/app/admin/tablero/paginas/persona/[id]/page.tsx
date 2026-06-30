@@ -2,7 +2,7 @@ import Link from "next/link";
 import { createSupabaseServiceRole } from "@/lib/supabase/server";
 import { BlockView } from "../../../block-view";
 import { loadAuthors, signMediaForNotes } from "../../../lib";
-import { groupBlocks, type BlockGroup, type DevBlock, type DevNote } from "../../../types";
+import { groupAt, groupBlocks, type BlockGroup, type DevBlock, type DevNote } from "../../../types";
 
 export const dynamic = "force-dynamic";
 
@@ -29,6 +29,12 @@ export default async function PersonaView({ params }: { params: Promise<{ id: st
       entries.push({ note: n, group: g });
     }
   }
+  // Más reciente primero, por fecha de creación del bloque.
+  entries.sort(
+    (a, b) =>
+      new Date(groupAt(b.group, b.note.created_at)).getTime() -
+      new Date(groupAt(a.group, a.note.created_at)).getTime(),
+  );
 
   return (
     <article className="flex flex-col gap-4 max-w-3xl">

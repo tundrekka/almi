@@ -128,7 +128,14 @@ export default async function PaginaView({
       if (!untagged && tags.length && !tags.every((t) => gTags.includes(t))) return false;
       if (q && !g.blocks.map(blockText).join(" ").toLowerCase().includes(ql)) return false;
       return true;
-    });
+    })
+    // Orden por fecha de creación del bloque, más reciente primero. Así el orden
+    // es estable aunque un bloque se mueva entre páginas (se añade al final).
+    .sort(
+      ({ g: a }, { g: b }) =>
+        new Date(groupAt(b, note.created_at)).getTime() -
+        new Date(groupAt(a, note.created_at)).getTime(),
+    );
 
   return (
     <article className="flex flex-col gap-4 max-w-3xl">
