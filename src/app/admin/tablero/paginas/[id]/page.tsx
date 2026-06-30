@@ -12,6 +12,7 @@ import {
   type DevNote,
 } from "../../types";
 import { AddBlockSection } from "../add-block-section";
+import { CollapseAllToggle, CollapseProvider, type PageOption } from "../blocks-collapse";
 import { EditableBlock } from "../editable-block";
 import { PageFilterBar } from "../page-filter-bar";
 import { PageTitle } from "../page-title";
@@ -75,11 +76,28 @@ export default async function PaginaView({
   ]);
   const signed = await signMediaForNotes([note]);
 
-  // Tags globales para autocompletar en el composer.
-  const { data: tagRows } = await supabase.from("zalut_dev_notes").select("tags").limit(1000);
+  // Tags globales (autocompletar) + lista de páginas (reasignar bloque).
+  const { data: noteRows } = await supabase
+    .from("zalut_dev_notes")
+    .select("id, icon, title, tags, system_key, updated_at")
+    .order("updated_at", { ascending: false })
+    .limit(1000);
   const tagSet = new Set<string>();
-  for (const r of tagRows ?? []) for (const t of (r.tags ?? []) as string[]) tagSet.add(t);
+  for (const r of noteRows ?? []) for (const t of (r.tags ?? []) as string[]) tagSet.add(t);
   const existingTags = [...tagSet].sort();
+
+  // Páginas para el selector de reasignación; "General" siempre primero.
+  const pages: PageOption[] = [...(noteRows ?? [])]
+    .sort((a, b) => {
+      if (a.system_key === "general") return -1;
+      if (b.system_key === "general") return 1;
+      return 0;
+    })
+    .map((r) => ({
+      id: r.id as string,
+      icon: (r.icon as string | null) ?? "📄",
+      title: (r.title as string | null) ?? "Sin título",
+    }));
 
   // Opciones de filtro: tags y autores presentes EN ESTA página.
   const tagCount = new Map<string, number>();
@@ -130,7 +148,13 @@ export default async function PaginaView({
       ) : null}
 
       {/* La página es el contenedor; dentro va una lista de bloques DISTINTOS. */}
-      <div className="flex flex-col gap-3">
+      <CollapseProvider defaultCollapsed>
+        {filtered.length > 0 ? (
+          <div className="flex justify-end -mb-1">
+            <CollapseAllToggle />
+          </div>
+        ) : null}
+        <div className="flex flex-col gap-3">
         {groups.length === 0 ? (
           <p className="text-sm text-muted py-4">
             Página vacía. Añade tu primer bloque abajo 👇
@@ -150,6 +174,7 @@ export default async function PaginaView({
                 blocks={g.blocks}
                 tags={groupTags(g)}
                 existingTags={existingTags}
+                pages={pages}
                 color={color}
                 email={ga?.email ?? "—"}
                 date={fmtDate(groupAt(g, note.created_at))}
@@ -174,7 +199,8 @@ export default async function PaginaView({
             );
           })
         )}
-      </div>
+        </div>
+      </CollapseProvider>
 
       <div className="mt-2">
         <AddBlockSection noteId={note.id} existingTags={existingTags} />

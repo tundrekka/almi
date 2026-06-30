@@ -257,9 +257,12 @@ export async function deleteNoteAction(formData: FormData): Promise<void> {
   // Borra archivos asociados.
   const { data: note } = await supabase
     .from("zalut_dev_notes")
-    .select("blocks")
+    .select("blocks, system_key")
     .eq("id", noteId)
     .maybeSingle();
+
+  // Las páginas de sistema (General, Facturas…) no se pueden borrar.
+  if (note?.system_key) return;
 
   const paths: string[] = [];
   for (const b of (note?.blocks ?? []) as DevBlock[]) {
@@ -653,6 +656,117 @@ export async function updateBlockGroupAction(
 
   revalidatePath(`/admin/tablero/paginas/${noteId}`);
   return { ok: "Bloque actualizado." };
+}
+
+// Mueve un bloque (grupo) de una página a otra. Lo quita de la página origen y
+// lo agrega al final de la destino, conservando autor/fecha originales. Permite
+// además editar su contenido en el mismo paso (los bloques que llegan son la
+// versión ya editada del grupo).
+export async function moveBlockGroupAction(
+  fromNoteId: string,
+  groupKey: string,
+  toNoteId: string,
+  incoming: DevBlock[],
+  manualTags: string[] = [],
+): Promise<ActionState> {
+  const user = await requireRole("admin");
+  if (!fromNoteId || !groupKey || !toNoteId) return { error: "Falta id." };
+  // Si la página destino es la misma, es una edición normal en el sitio.
+  if (fromNoteId === toNoteId)
+    return updateBlockGroupAction(fromNoteId, groupKey, incoming, manualTags);
+
+  const clean = (Array.isArray(incoming) ? incoming : [])
+    .map((b) => sanitizeBlock(b))
+    .filter((b): b is DevBlock => b !== null);
+  if (clean.length === 0) return { error: "Agrega al menos un bloque con contenido." };
+
+  const supabase = createSupabaseServiceRole();
+  const [{ data: from }, { data: to }] = await Promise.all([
+    supabase
+      .from("zalut_dev_notes")
+      .select("blocks, title, edits")
+      .eq("id", fromNoteId)
+      .maybeSingle(),
+    supabase
+      .from("zalut_dev_notes")
+      .select("blocks, title, edits")
+      .eq("id", toNoteId)
+      .maybeSingle(),
+  ]);
+  if (!from) return { error: "Página origen no encontrada." };
+  if (!to) return { error: "Página destino no encontrada." };
+
+  const fromAll = (from.blocks ?? []) as DevBlock[];
+  const oldGroup = fromAll.filter((b) => (b.group ?? b.id) === groupKey);
+  if (oldGroup.length === 0) return { error: "Bloque no encontrado." };
+
+  // Conserva grupo/autor/fecha; tags = manual + #hashtags del propio texto.
+  const origAuthor = oldGroup[0].author;
+  const origAt = oldGroup[0].at;
+  const groupAuto = extractTags(buildSearchText(clean, null));
+  const manual = (Array.isArray(manualTags) ? manualTags : []).map(normTag).filter(Boolean);
+  const blockTags = [...new Set([...manual, ...groupAuto])];
+  for (const b of clean) {
+    b.group = groupKey;
+    b.author = origAuthor;
+    b.at = origAt;
+    b.tags = blockTags;
+  }
+
+  // Media huérfana: la que estaba en el grupo viejo y ya no se usa tras editar.
+  const newPaths = new Set(
+    clean
+      .filter((b) => b.kind === "image" || b.kind === "audio" || b.kind === "file")
+      .map((b) => b.path),
+  );
+  const orphans = oldGroup
+    .filter((b) => b.kind === "image" || b.kind === "audio" || b.kind === "file")
+    .map((b) => b.path)
+    .filter((p) => !newPaths.has(p));
+  if (orphans.length) await supabase.storage.from(DEV_MEDIA_BUCKET).remove(orphans);
+
+  // Origen: quita el grupo.
+  const fromBlocks = fromAll.filter((b) => (b.group ?? b.id) !== groupKey);
+  const fromTags = [...new Set(fromBlocks.flatMap((b) => b.tags ?? []))] as string[];
+  const fromEdits = Array.isArray(from.edits)
+    ? (from.edits as { user_id: string; at: string }[])
+    : [];
+  fromEdits.push({ user_id: user.id, at: new Date().toISOString() });
+
+  // Destino: agrega el grupo al final.
+  const toBlocks = [...((to.blocks ?? []) as DevBlock[]), ...clean];
+  const toTags = [...new Set(toBlocks.flatMap((b) => b.tags ?? []))] as string[];
+  const toEdits = Array.isArray(to.edits)
+    ? (to.edits as { user_id: string; at: string }[])
+    : [];
+  toEdits.push({ user_id: user.id, at: new Date().toISOString() });
+
+  const [{ error: e1 }, { error: e2 }] = await Promise.all([
+    supabase
+      .from("zalut_dev_notes")
+      .update({
+        blocks: fromBlocks,
+        search_text: buildSearchText(fromBlocks, (from.title as string | null) ?? null),
+        tags: fromTags,
+        edits: fromEdits,
+      })
+      .eq("id", fromNoteId),
+    supabase
+      .from("zalut_dev_notes")
+      .update({
+        blocks: toBlocks,
+        search_text: buildSearchText(toBlocks, (to.title as string | null) ?? null),
+        tags: toTags,
+        edits: toEdits,
+      })
+      .eq("id", toNoteId),
+  ]);
+  if (e1 || e2) return { error: (e1 ?? e2)?.message };
+
+  revalidatePath(`/admin/tablero/paginas/${fromNoteId}`);
+  revalidatePath(`/admin/tablero/paginas/${toNoteId}`);
+  revalidatePath("/admin/tablero/paginas");
+  return { ok: "Bloque movido." };
 }
 
 // Borra un bloque completo (grupo) de una página. `key` es el group del lote,

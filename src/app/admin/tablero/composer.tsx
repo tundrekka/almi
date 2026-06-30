@@ -5,10 +5,12 @@ import { useRouter } from "next/navigation";
 import {
   appendBlocksAction,
   createNoteAction,
+  moveBlockGroupAction,
   updateBlockGroupAction,
   updateNoteAction,
   uploadMediaAction,
 } from "./actions";
+import type { PageOption } from "./paginas/blocks-collapse";
 import { Spinner } from "./spinner";
 import { TagPicker } from "./tag-picker";
 import type { DevBlock, TodoItem } from "./types";
@@ -58,6 +60,7 @@ export function Composer({
   appendToNoteId,
   onAppended,
   editGroup,
+  pages,
 }: {
   existingTags?: string[];
   noteId?: string;
@@ -69,6 +72,8 @@ export function Composer({
   onAppended?: () => void;
   // Modo "editar un bloque (grupo)": reemplaza ese grupo en su sitio.
   editGroup?: { noteId: string; groupKey: string };
+  // Páginas disponibles para reasignar el bloque (solo en modo editar grupo).
+  pages?: PageOption[];
 }) {
   const router = useRouter();
   const isEdit = !!noteId;
@@ -77,6 +82,8 @@ export function Composer({
 
   const [title, setTitle] = useState(initial?.title ?? "");
   const [tags, setTags] = useState<string[]>(initial?.tags ?? []);
+  // Página destino: por defecto la actual; si cambia, el bloque se mueve.
+  const [targetNoteId, setTargetNoteId] = useState(editGroup?.noteId ?? "");
   const [blocks, setBlocks] = useState<DraftBlock[]>(
     initial?.blocks
       ? initial.blocks.map((b) => devBlockToDraft(b))
@@ -89,6 +96,8 @@ export function Composer({
   const hasUploading = blocks.some(
     (b) => (b.kind === "image" || b.kind === "audio" || b.kind === "file") && b.uploading,
   );
+  const willMove =
+    isEditGroup && !!targetNoteId && targetNoteId !== editGroup?.noteId;
 
   function add(kind: DraftBlock["kind"]) {
     setError(null);
@@ -265,13 +274,22 @@ export function Composer({
     }
 
     if (isEditGroup && editGroup) {
+      const moving = !!targetNoteId && targetNoteId !== editGroup.noteId;
       startTransition(async () => {
-        const res = await updateBlockGroupAction(
-          editGroup.noteId,
-          editGroup.groupKey,
-          cleaned,
-          tags,
-        );
+        const res = moving
+          ? await moveBlockGroupAction(
+              editGroup.noteId,
+              editGroup.groupKey,
+              targetNoteId,
+              cleaned,
+              tags,
+            )
+          : await updateBlockGroupAction(
+              editGroup.noteId,
+              editGroup.groupKey,
+              cleaned,
+              tags,
+            );
         if (res?.error) setError(res.error);
         else {
           setOk(res?.ok ?? "Guardado.");
@@ -338,6 +356,25 @@ export function Composer({
         <TagPicker selected={tags} existing={existingTags} onChange={setTags} />
       ) : null}
 
+      {/* Reasignar el bloque a otra página. */}
+      {isEditGroup && pages && pages.length > 0 ? (
+        <label className="flex items-center gap-2 text-sm">
+          <span className="text-muted shrink-0">Página</span>
+          <select
+            value={targetNoteId}
+            onChange={(e) => setTargetNoteId(e.target.value)}
+            className="flex-1 h-10 rounded-xl border border-line bg-white px-3 text-sm focus:outline-none focus:border-ink cursor-pointer"
+          >
+            {pages.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.icon} {p.title}
+                {p.id === editGroup?.noteId ? " (actual)" : ""}
+              </option>
+            ))}
+          </select>
+        </label>
+      ) : null}
+
       <div className="flex flex-col gap-3">
         {blocks.map((b, i) => (
           <BlockEditor
@@ -382,14 +419,18 @@ export function Composer({
             {pending
               ? isAppend
                 ? "Añadiendo…"
-                : "Guardando…"
+                : willMove
+                  ? "Moviendo…"
+                  : "Guardando…"
               : hasUploading
                 ? "Esperando subida…"
                 : isAppend
                   ? "Añadir a la página"
-                  : isEdit || isEditGroup
-                    ? "Guardar cambios"
-                    : "Publicar bloque"}
+                  : willMove
+                    ? "Mover bloque"
+                    : isEdit || isEditGroup
+                      ? "Guardar cambios"
+                      : "Publicar bloque"}
           </button>
         </div>
       </div>

@@ -83,6 +83,29 @@ body {
   filter: blur(40px);
 }
 
+/* Bloques colapsados en el tablero: recorta altura y miniaturiza imágenes
+   para que el scroll por la página sea compacto. La especificidad (0,1,1) gana
+   a las utilidades de Tailwind (w-full, max-h-[480px]) sin necesidad de !important. */
+.block-collapsed {
+  position: relative;
+  max-height: 168px;
+  overflow: hidden;
+}
+.block-collapsed img {
+  max-height: 120px;
+  width: auto;
+}
+/* Desvanecido inferior: solo cuando el contenido realmente se recorta. */
+.block-collapsed--fade::after {
+  content: "";
+  position: absolute;
+  inset-inline: 0;
+  bottom: 0;
+  height: 56px;
+  background: linear-gradient(to top, #ffffff, rgba(255, 255, 255, 0));
+  pointer-events: none;
+}
+
 /* Floating product card subtle hover */
 .float {
   transition: transform 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
