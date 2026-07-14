@@ -1,8 +1,20 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { headers } from "next/headers";
 import { createSupabaseServer } from "@/lib/supabase/server";
 import { env } from "@/lib/env";
+
+// Origen público de la app derivado del request; así el link del correo
+// apunta al dominio donde el usuario está navegando (prod o local),
+// sin depender de NEXT_PUBLIC_SITE_URL.
+async function requestOrigin(): Promise<string> {
+  const h = await headers();
+  const host = h.get("x-forwarded-host") ?? h.get("host");
+  if (!host) return env.SITE_URL;
+  const proto = h.get("x-forwarded-proto") ?? (host.startsWith("localhost") ? "http" : "https");
+  return `${proto}://${host}`;
+}
 
 type State = { error?: string; code?: "already_registered" | "invalid_credentials" } | undefined;
 
@@ -80,7 +92,7 @@ export async function requestPasswordResetAction(
   if (!email) return { error: "Ingresa tu correo." };
 
   const supabase = await createSupabaseServer();
-  const redirectTo = `${env.SITE_URL}/auth/callback?next=/auth/reset`;
+  const redirectTo = `${await requestOrigin()}/auth/callback?next=/auth/reset`;
   const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo });
   if (error) return { error: error.message };
 
