@@ -1,7 +1,12 @@
 import Link from "next/link";
 import { ForgotForm } from "./forgot-form";
 
-export default function ForgotPasswordPage() {
+export default async function ForgotPasswordPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ error?: string }>;
+}) {
+  const { error } = await searchParams;
   return (
     <main className="min-h-screen grid place-items-center bg-paper px-6 py-10">
       <div className="w-full max-w-md bg-white rounded-3xl border border-line p-8 sm:p-10 shadow-sm">
@@ -12,6 +17,12 @@ export default function ForgotPasswordPage() {
         <p className="mt-2 text-sm text-muted">
           Ingresa tu correo y te enviaremos un enlace para restablecerla.
         </p>
+        {error === "link" ? (
+          <div className="mt-4 rounded-xl bg-[#FEECEC] text-[#9F1A1A] text-sm px-3 py-2">
+            El enlace no es válido o ya fue usado. Pide uno nuevo — cada enlace sirve una sola
+            vez y abre mejor en el mismo navegador donde lo solicitaste.
+          </div>
+        ) : null}
         <div className="mt-8">
           <ForgotForm />
         </div>

@@ -15,7 +15,7 @@ export const env = {
     return read("NEXT_PUBLIC_SUPABASE_ANON_KEY");
   },
   get SITE_URL() {
-    return process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3010";
+    return process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3020";
   },
 };
 
