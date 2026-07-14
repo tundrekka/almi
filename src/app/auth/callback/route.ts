@@ -18,7 +18,10 @@ export async function GET(request: NextRequest) {
       console.error("auth/callback verifyOtp:", error.message);
       return NextResponse.redirect(new URL("/auth/forgot?error=link", origin));
     }
-    return NextResponse.redirect(new URL(next, origin));
+    // Un link de recovery siempre debe caer en la pantalla de nueva contraseña,
+    // aunque el parámetro next se pierda al compartir el link.
+    const dest = type === "recovery" ? "/auth/reset" : next;
+    return NextResponse.redirect(new URL(dest, origin));
   }
 
   if (code) {
